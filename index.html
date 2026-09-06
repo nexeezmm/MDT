@@ -167,7 +167,7 @@
     <div class="top-bar">
       <button class="toggle-btn" id="toggleSidebar"><i class="fa-solid fa-bars"></i></button>
       <div class="user-info-box">
-        <button class="btn btn-perm" id="openPermModalBtn" style="display:none;"><i class="fa-solid fa-user-shield"></i> YETKİ YÖNETİMİ</button>
+        <button class="btn btn-perm" id="openPermModalBtn"><i class="fa-solid fa-user-shield"></i> YETKİ YÖNETİMİ</button>
         <span class="user-info" id="activeUserInfo">Bilinmeyen Kullanıcı</span>
       </div>
     </div>
@@ -228,7 +228,7 @@
     // --- DISCORD VE KURUCU AYARLARI ---
     const DISCORD_CLIENT_ID = "1545959209584304238"; 
     const REDIRECT_URI = "https://nexeezmm.github.io/MDT/";
-    const KURUCU_DISCORD_ID = "793950477271957525"; // Sen
+    const KURUCU_DISCORD_ID = "793950477271957525";
 
     // --- FIREBASE BAĞLANTISI ---
     const firebaseConfig = {
@@ -277,13 +277,17 @@
 
     function saveNotes() { localStorage.setItem('mrpd_notes', JSON.stringify(notes)); }
 
-    // --- DISCORD GİRİŞ İŞLEMLERİ ---
-    discordLoginBtn.addEventListener('click', () => {
-      const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=token&scope=identify`;
-      window.location.href = authUrl;
-    });
-
+    // --- OTOMATİK OTURUM KONTROLÜ (BENİ HATIRLA) ---
     function checkDiscordToken() {
+      const savedUser = localStorage.getItem('mrpd_saved_user');
+      if (savedUser) {
+        try {
+          aktifKullanici = JSON.parse(savedUser);
+          oturumAc();
+          return;
+        } catch(e) { localStorage.removeItem('mrpd_saved_user'); }
+      }
+
       const hash = window.location.hash.substring(1);
       const params = new URLSearchParams(hash);
       const accessToken = params.get('access_token');
@@ -308,39 +312,27 @@
       }
     }
 
+    discordLoginBtn.addEventListener('click', () => {
+      const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=token&scope=identify`;
+      window.location.href = authUrl;
+    });
+
     window.addEventListener('DOMContentLoaded', checkDiscordToken);
     window.addEventListener('hashchange', checkDiscordToken);
 
     function kullaniciYetkisiniGetir(userData) {
-      // Firebase'den bu kullanıcının yetkisini çek
       db.ref('yetkiler/' + userData.id).once('value').then((snapshot) => {
         const val = snapshot.val();
 
-        // Kurucu sorgusu
         if (userData.id === KURUCU_DISCORD_ID) {
-          aktifKullanici = {
-            id: userData.id,
-            isim: val ? val.isim : "Erkan",
-            rol: "Kurucu",
-            seviye: 2
-          };
+          aktifKullanici = { id: userData.id, isim: val ? val.isim : "Erkan", rol: "Kurucu", seviye: 2 };
         } else if (val) {
-          aktifKullanici = {
-            id: userData.id,
-            isim: val.isim || userData.global_name || userData.username,
-            rol: val.rol || "Memur",
-            seviye: parseInt(val.seviye) || 0
-          };
+          aktifKullanici = { id: userData.id, isim: val.isim || userData.username, rol: val.rol || "Memur", seviye: parseInt(val.seviye) || 0 };
         } else {
-          // Tanımsız kullanıcılara salt okunur erişim ver
-          aktifKullanici = {
-            id: userData.id,
-            isim: userData.global_name || userData.username,
-            rol: "Stajyer Memur",
-            seviye: 0
-          };
+          aktifKullanici = { id: userData.id, isim: userData.username, rol: "Stajyer Memur", seviye: 0 };
         }
 
+        localStorage.setItem('mrpd_saved_user', JSON.stringify(aktifKullanici));
         oturumAc();
       });
     }
@@ -348,10 +340,6 @@
     function oturumAc() {
       loginScreen.style.display = 'none';
       activeUserInfo.innerHTML = `AKTİF PROFİL: <span style="color:white;">${aktifKullanici.isim} [${aktifKullanici.rol}]</span>`;
-      
-      if (aktifKullanici.id === KURUCU_DISCORD_ID) {
-        openPermModalBtn.style.display = 'inline-flex';
-      }
 
       arayuzuYetkiyeGoreAyarla();
       renderNotesList();
