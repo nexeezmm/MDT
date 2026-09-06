@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MRPD - Mobile Data Terminal</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- FIREBASE SDK (COMPAT VERSION) -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap');
+
+    :root {
+      --bg-color: #050b14;
+      --sidebar-bg: #0a1325;
+      --panel-bg: #0f1c35;
+      --primary-blue: #1e62d0;
+      --primary-blue-hover: #3178eb;
+      --accent-gold: #f5c451;
+      --text-main: #e2e8f0;
+      --text-muted: #8b9bb4;
+      --danger: #d93025;
+      --border-color: #1e3256;
+      --success-green: #2ec4b6;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Rajdhani', sans-serif; background-color: var(--bg-color); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; }
+
+    /* --- GİRİŞ EKRANI --- */
+    #loginScreen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle at center, var(--panel-bg) 0%, var(--bg-color) 100%); z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; }
+    #loginScreen h1 { color: var(--accent-gold); font-size: 2.5rem; letter-spacing: 2px; text-shadow: 0 0 10px rgba(245, 196, 81, 0.3); }
+    .pin-input { padding: 15px; font-size: 1.5rem; text-align: center; background: rgba(10, 19, 37, 0.9); color: white; border: 2px solid var(--border-color); border-radius: 6px; outline: none; letter-spacing: 5px; transition: 0.3s; }
+    .pin-input:focus { border-color: var(--accent-gold); box-shadow: 0 0 15px rgba(245, 196, 81, 0.2); }
+
+    /* --- SOL MENÜ --- */
+    .sidebar { width: 280px; background-color: var(--sidebar-bg); border-right: 2px solid var(--border-color); display: flex; flex-direction: column; transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1); box-shadow: 5px 0 15px rgba(0,0,0,0.5); z-index: 10; }
+    .sidebar.collapsed { transform: translateX(-280px); margin-right: -280px; }
+    .brand { padding: 20px; display: flex; align-items: center; gap: 15px; border-bottom: 2px solid var(--border-color); background: linear-gradient(180deg, #112140 0%, var(--sidebar-bg) 100%); }
+    .logo-svg { width: 50px; height: 50px; filter: drop-shadow(0 0 5px var(--accent-gold)); animation: pulse 2s infinite; }
+    .brand-text h1 { font-size: 1.4rem; color: var(--accent-gold); text-transform: uppercase; letter-spacing: 1px; }
+    .brand-text p { font-size: 0.8rem; color: var(--text-muted); font-family: 'Roboto Mono', monospace; }
+    .controls { padding: 15px; display: flex; gap: 10px; border-bottom: 1px solid var(--border-color); }
+    
+    .btn { background-color: var(--primary-blue); color: white; border: 1px solid #3178eb; padding: 10px 15px; border-radius: 4px; cursor: pointer; font-family: 'Rajdhani', sans-serif; font-weight: 600; font-size: 1rem; transition: all 0.3s ease; display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .btn:hover { background-color: var(--primary-blue-hover); box-shadow: 0 0 10px var(--primary-blue); transform: translateY(-2px); }
+    .btn-new { flex: 1; }
+    
+    .notes-list { flex: 1; overflow-y: auto; list-style: none; padding: 10px; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--sidebar-bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--primary-blue); }
+
+    .note-item { padding: 12px 15px; margin-bottom: 8px; background-color: var(--panel-bg); border: 1px solid var(--border-color); border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: all 0.2s ease; font-size: 1.1rem; }
+    .note-item i { color: var(--accent-gold); }
+    .note-item:hover { background-color: #16294d; border-color: var(--primary-blue); transform: translateX(5px); }
+    .note-item.active { background-color: var(--primary-blue); border-color: var(--primary-blue-hover); box-shadow: inset 4px 0 0 var(--accent-gold); }
+    .note-item.active i { color: white; }
+
+    /* --- ORTA İÇERİK --- */
+    .main-content { flex: 1; display: flex; flex-direction: column; background: radial-gradient(circle at center, var(--panel-bg) 0%, var(--bg-color) 100%); position: relative; }
+    .top-bar { height: 60px; background-color: var(--sidebar-bg); border-bottom: 2px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; padding: 0 20px; }
+    .toggle-btn { background: none; border: none; color: var(--accent-gold); font-size: 1.5rem; cursor: pointer; transition: 0.3s; }
+    .toggle-btn:hover { color: white; text-shadow: 0 0 8px var(--accent-gold); }
+    .user-info { color: var(--accent-gold); font-family: 'Roboto Mono', monospace; font-size: 0.9rem; }
+    
+    .editor-container { flex: 1; padding: 30px; display: flex; flex-direction: column; gap: 20px; animation: fadeIn 0.5s ease; overflow: hidden; }
+    .editor-header { display: flex; gap: 15px; }
+    .title-input { flex: 1; background-color: rgba(10, 19, 37, 0.7); border: 2px solid var(--border-color); color: var(--accent-gold); font-family: 'Rajdhani', sans-serif; font-size: 1.8rem; font-weight: 700; padding: 12px 20px; border-radius: 4px; outline: none; transition: 0.3s; text-transform: uppercase; }
+    .title-input:focus:not([readonly]) { border-color: var(--accent-gold); box-shadow: 0 0 15px rgba(245, 196, 81, 0.2); }
+    .title-input[readonly] { cursor: not-allowed; opacity: 0.8; }
+    
+    .btn-delete { background-color: transparent; border: 2px solid var(--danger); color: var(--danger); }
+    .btn-delete:hover { background-color: var(--danger); color: white; box-shadow: 0 0 15px rgba(217, 48, 37, 0.5); }
+
+    /* ZENGİN METİN EDİTÖRÜ CSS AYARLARI */
+    .body-textarea { 
+      flex: 1; 
+      background-color: rgba(10, 19, 37, 0.7); 
+      border: 2px solid var(--border-color); 
+      color: #a0aec0; 
+      font-family: 'Roboto Mono', monospace; 
+      font-size: 1rem; 
+      padding: 20px; 
+      border-radius: 4px; 
+      outline: none; 
+      line-height: 1.6; 
+      transition: 0.3s; 
+      overflow-y: auto; 
+    }
+    .body-textarea:focus:not([contenteditable="false"]) { border-color: var(--primary-blue); box-shadow: 0 0 15px rgba(30, 98, 208, 0.2); color: white; }
+    .body-textarea[contenteditable="false"] { cursor: not-allowed; opacity: 0.8; }
+    .body-textarea[contenteditable]:empty::before { content: attr(data-placeholder); color: #8b9bb4; pointer-events: none; display: block; }
+    .body-textarea img { max-width: 100%; border-radius: 6px; border: 2px solid var(--accent-gold); margin: 15px 0; display: block; }
+
+    /* --- SAĞ TARAF: CANLI DEVRİYE / AKTİF MEMURLAR PANENELİ --- */
+    .active-officers-panel {
+      width: 260px;
+      background-color: var(--sidebar-bg);
+      border-left: 2px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      box-shadow: -5px 0 15px rgba(0,0,0,0.5);
+      z-index: 5;
+    }
+    .panel-title {
+      padding: 18px 15px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--accent-gold);
+      border-bottom: 2px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: linear-gradient(180deg, #112140 0%, var(--sidebar-bg) 100%);
+    }
+    .officers-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .officer-card {
+      background-color: var(--panel-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 10px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .officer-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: 2px solid var(--primary-blue);
+      object-fit: cover;
+    }
+    .officer-info { display: flex; flex-direction: column; overflow: hidden; }
+    .officer-name { font-weight: 700; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .officer-status { font-size: 0.75rem; color: var(--success-green); display: flex; align-items: center; gap: 5px; font-family: 'Roboto Mono', monospace; }
+    .status-dot { width: 8px; height: 8px; background-color: var(--success-green); border-radius: 50%; box-shadow: 0 0 6px var(--success-green); }
+
+    @keyframes pulse { 0% { filter: drop-shadow(0 0 2px var(--accent-gold)); } 50% { filter: drop-shadow(0 0 10px var(--accent-gold)); } 100% { filter: drop-shadow(0 0 2px var(--accent-gold)); } }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .scanlines { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%); background-size: 100% 4px; pointer-events: none; z-index: 999; opacity: 0.3; }
+  </style>
+</head>
+<body>
+
+  <!-- YETKİ GİRİŞ EKRANI -->
+  <div id="loginScreen">
+    <svg class="logo-svg" style="width: 100px; height: 100px; margin-bottom: 20px;" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <path d="M50 5 L10 20 L10 55 C10 85 50 95 50 95 C50 95 90 85 90 55 L90 20 Z" fill="#0a1325" stroke="#f5c451" stroke-width="4"/>
+      <path d="M50 12 L18 25 L18 53 C18 78 50 87 50 87 C50 87 82 78 82 53 L82 25 Z" fill="#1e62d0"/>
+      <polygon points="50,22 57,40 76,40 61,51 67,69 50,58 33,69 39,51 24,40 43,40" fill="#f5c451"/>
+    </svg>
+    <h1>MRPD TERMİNAL GİRİŞİ</h1>
+    <input type="password" id="pinInput" class="pin-input" placeholder="SİCİL PİN" autocomplete="off">
+    <button id="loginBtn" class="btn" style="width: 280px; font-size: 1.2rem; padding: 15px;"><i class="fa-solid fa-right-to-bracket"></i> SİSTEME BAĞLAN</button>
+    <p id="loginError" style="color: var(--danger); font-weight: bold; display: none;">Geçersiz veya Yetkisiz Sicil Kodu!</p>
+  </div>
+
+  <!-- SOL MENÜ -->
+  <div class="sidebar" id="sidebar">
+    <div class="brand">
+      <svg class="logo-svg" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <path d="M50 5 L10 20 L10 55 C10 85 50 95 50 95 C50 95 90 85 90 55 L90 20 Z" fill="#0a1325" stroke="#f5c451" stroke-width="4"/>
+        <path d="M50 12 L18 25 L18 53 C18 78 50 87 50 87 C50 87 82 78 82 53 L82 25 Z" fill="#1e62d0"/>
+        <polygon points="50,22 57,40 76,40 61,51 67,69 50,58 33,69 39,51 24,40 43,40" fill="#f5c451"/>
+      </svg>
+      <div class="brand-text">
+        <h1>MRPD MDT</h1>
+        <p>SECURE TERMINAL</p>
+      </div>
+    </div>
+    <div class="controls">
+      <button class="btn btn-new" id="addNoteBtn" style="display:none;"><i class="fa-solid fa-folder-plus"></i> YENİ RAPOR</button>
+    </div>
+    <ul class="notes-list" id="notesList"></ul>
+  </div>
+
+  <!-- ORTA İÇERİK -->
+  <div class="main-content">
+    <div class="scanlines"></div>
+    <div class="top-bar">
+      <button class="toggle-btn" id="toggleSidebar"><i class="fa-solid fa-bars"></i></button>
+      <span class="user-info" id="activeUserInfo">Bilinmeyen Kullanıcı</span>
+    </div>
+    <div class="editor-container" id="editorContainer">
+      <div class="editor-header">
+        <input type="text" class="title-input" id="noteTitle" placeholder="DOSYA BAŞLIĞI / OLAY NO..." autocomplete="off" readonly>
+        <button class="btn btn-delete" id="deleteNoteBtn" style="display:none;"><i class="fa-solid fa-trash-can"></i> İMHA ET</button>
+      </div>
+      <div class="body-textarea" id="noteBody" contenteditable="false" data-placeholder="Vaka detaylarını, şüpheli bilgilerini giriniz veya resim kopyalayıp buraya yapıştırınız (Ctrl+V)..."></div>
+    </div>
+  </div>
+
+  <!-- SAĞ TARAF: CANLI DEVRİYE / AKTİF MEMURLAR PANENELİ -->
+  <div class="active-officers-panel">
+    <div class="panel-title">
+      <i class="fa-solid fa-headset"></i> AKTİF MEMURLAR
+    </div>
+    <div class="officers-list" id="officersList">
+      <p style="color: var(--text-muted); font-size: 0.85rem; text-align: center; margin-top: 20px;">
+        Ses kanalında memur bulunmuyor.
+      </p>
+    </div>
+  </div>
+
+  <script>
+    // --- FIREBASE BAĞLANTISI ---
+    const firebaseConfig = {
+      apiKey: "AIzaSyASpycoIX3sd23tEkdh7mSRv1Qu2sU7EvE",
+      authDomain: "mdt-n-65377.firebaseapp.com",
+      databaseURL: "https://mdt-n-65377-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "mdt-n-65377",
+      storageBucket: "mdt-n-65377.firebasestorage.app",
+      messagingSenderId: "53372845182",
+      appId: "1:53372845182:web:b305727de09564c8e82c2f",
+      measurementId: "G-RFLV834YZ9"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // --- 1. KULLANICI VE YETKİ SİSTEMİ ---
+    const kullanicilar = {
+      "1999": { isim: "Erkan", rol: "Kurucu", seviye: 2 },
+      "2000": { isim: "Yönetim", rol: "Admin", seviye: 1 },
+      "3000": { isim: "Memur", rol: "Üye", seviye: 0 }
+    };
+    let aktifKullanici = null;
+
+    // --- 2. DOM ELEMANLARI ---
+    const loginScreen = document.getElementById('loginScreen');
+    const pinInput = document.getElementById('pinInput');
+    const loginBtn = document.getElementById('loginBtn');
+    const loginError = document.getElementById('loginError');
+    const activeUserInfo = document.getElementById('activeUserInfo');
+
+    const notesListEl = document.getElementById('notesList');
+    const noteTitleEl = document.getElementById('noteTitle');
+    const noteBodyEl = document.getElementById('noteBody');
+    const addNoteBtn = document.getElementById('addNoteBtn');
+    const deleteNoteBtn = document.getElementById('deleteNoteBtn');
+    const toggleSidebarBtn = document.getElementById('toggleSidebar');
+    const sidebarEl = document.getElementById('sidebar');
+    const officersListEl = document.getElementById('officersList');
+
+    // --- 3. VERİ SİSTEMİ ---
+    let notes = JSON.parse(localStorage.getItem('mrpd_notes')) || [
+      { id: 1, title: 'AKTİF KODLAR (10-KODLARI)', body: '10-04: Anlaşıldı<br>10-20: Konum Bildir<br><br><i>Telsiz kodlarına riayet ediniz.</i>' }
+    ];
+    let activeNoteId = notes.length > 0 ? notes[0].id : null;
+
+    function saveNotes() { localStorage.setItem('mrpd_notes', JSON.stringify(notes)); }
+
+    // --- 4. GİRİŞ İŞLEMLERİ ---
+    loginBtn.addEventListener('click', islemeBasla);
+    pinInput.addEventListener('keypress', function(e) { if (e.key === 'Enter') islemeBasla(); });
+
+    function islemeBasla() {
+      const pin = pinInput.value;
+      if (kullanicilar[pin]) {
+        aktifKullanici = kullanicilar[pin];
+        loginScreen.style.display = 'none';
+        activeUserInfo.innerHTML = `AKTİF PROFİL: <span style="color:white;">${aktifKullanici.isim} [${aktifKullanici.rol}]</span>`;
+        arayuzuYetkiyeGoreAyarla();
+        renderNotesList();
+        loadActiveNote();
+        listenActiveOfficers(); // Firebase CANLI DİNLEME BAŞLAT
+      } else {
+        loginError.style.display = 'block';
+        pinInput.value = '';
+      }
+    }
+
+    function arayuzuYetkiyeGoreAyarla() {
+      if (aktifKullanici.seviye === 0) { // ÜYE
+        addNoteBtn.style.display = 'none';
+        deleteNoteBtn.style.display = 'none';
+        noteTitleEl.readOnly = true;
+        noteBodyEl.setAttribute('contenteditable', 'false');
+      } 
+      else if (aktifKullanici.seviye === 1) { // ADMİN
+        addNoteBtn.style.display = 'flex';
+        deleteNoteBtn.style.display = 'none';
+        noteTitleEl.readOnly = false;
+        noteBodyEl.setAttribute('contenteditable', 'true');
+      }
+      else if (aktifKullanici.seviye === 2) { // KURUCU
+        addNoteBtn.style.display = 'flex';
+        deleteNoteBtn.style.display = 'flex';
+        noteTitleEl.readOnly = false;
+        noteBodyEl.setAttribute('contenteditable', 'true');
+      }
+    }
+
+    // --- 5. UYGULAMA İŞLEMLERİ ---
+    function renderNotesList() {
+      notesListEl.innerHTML = '';
+      notes.forEach(note => {
+        const li = document.createElement('li');
+        li.classList.add('note-item');
+        if (note.id === activeNoteId) li.classList.add('active');
+        li.innerHTML = `<i class="fa-solid fa-file-shield"></i> <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${note.title || 'İSİMSİZ DOSYA'}</span>`;
+        
+        li.addEventListener('click', () => {
+          activeNoteId = note.id;
+          loadActiveNote();
+          renderNotesList();
+          document.getElementById('editorContainer').style.animation = 'none';
+          setTimeout(() => document.getElementById('editorContainer').style.animation = 'fadeIn 0.3s ease', 10);
+        });
+        notesListEl.appendChild(li);
+      });
+    }
+
+    function loadActiveNote() {
+      const activeNote = notes.find(n => n.id === activeNoteId);
+      if (activeNote) {
+        noteTitleEl.value = activeNote.title;
+        noteBodyEl.innerHTML = activeNote.body || '';
+      } else {
+        noteTitleEl.value = '';
+        noteBodyEl.innerHTML = '';
+      }
+    }
+
+    addNoteBtn.addEventListener('click', () => {
+      if (aktifKullanici.seviye < 1) return;
+      const newNote = { id: Date.now(), title: 'YENİ DOSYA #' + Math.floor(Math.random() * 1000), body: '' };
+      notes.unshift(newNote);
+      activeNoteId = newNote.id;
+      saveNotes();
+      renderNotesList();
+      loadActiveNote();
+      noteTitleEl.focus();
+    });
+
+    noteTitleEl.addEventListener('input', (e) => {
+      if (aktifKullanici.seviye < 1) return;
+      const activeNote = notes.find(n => n.id === activeNoteId);
+      if (activeNote) { activeNote.title = e.target.value; saveNotes(); renderNotesList(); }
+    });
+
+    noteBodyEl.addEventListener('input', (e) => {
+      if (aktifKullanici.seviye < 1) return;
+      const activeNote = notes.find(n => n.id === activeNoteId);
+      if (activeNote) { activeNote.body = noteBodyEl.innerHTML; saveNotes(); }
+    });
+
+    // --- RESİM YAPIŞTIRMA (PASTE) SİSTEMİ ---
+    noteBodyEl.addEventListener('paste', (e) => {
+      if (aktifKullanici.seviye < 1) {
+        e.preventDefault();
+        return;
+      }
+      
+      const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+      for (let index in items) {
+        const item = items[index];
+        if (item.kind === 'file' && item.type.startsWith('image/')) {
+          e.preventDefault();
+          
+          const blob = item.getAsFile();
+          const reader = new FileReader();
+          
+          reader.onload = function(event) {
+            const imgHTML = `<br><img src="${event.target.result}" alt="Kanıt Resmi" /><br>`;
+            document.execCommand('insertHTML', false, imgHTML);
+            
+            const activeNote = notes.find(n => n.id === activeNoteId);
+            if (activeNote) {
+              activeNote.body = noteBodyEl.innerHTML;
+              saveNotes();
+            }
+          };
+          reader.readAsDataURL(blob);
+        }
+      }
+    });
+
+    deleteNoteBtn.addEventListener('click', () => {
+      if (aktifKullanici.seviye < 2) return;
+      if (notes.length === 0) return;
+      if(confirm('Bu dosyayı sistemden tamamen silmek istediğinize emin misiniz?')) {
+        notes = notes.filter(n => n.id !== activeNoteId);
+        activeNoteId = notes.length > 0 ? notes[0].id : null;
+        saveNotes();
+        renderNotesList();
+        loadActiveNote();
+      }
+    });
+
+    toggleSidebarBtn.addEventListener('click', () => { sidebarEl.classList.toggle('collapsed'); });
+
+    // --- CANLI FIREBASE DİNLEYİCİ (AKTİF MEMURLAR) ---
+    function listenActiveOfficers() {
+      db.ref('aktif_memurlar').on('value', (snapshot) => {
+        const data = snapshot.val();
+        officersListEl.innerHTML = '';
+
+        if (!data || data.length === 0) {
+          officersListEl.innerHTML = `
+            <p style="color: var(--text-muted); font-size: 0.85rem; text-align: center; margin-top: 20px;">
+              Ses kanalında devriyede memur bulunmuyor.
+            </p>`;
+          return;
+        }
+
+        data.forEach(memur => {
+          const card = document.createElement('div');
+          card.className = 'officer-card';
+          card.innerHTML = `
+            <img src="${memur.avatar}" class="officer-avatar" alt="Avatar">
+            <div class="officer-info">
+              <span class="officer-name">${memur.isim}</span>
+              <span class="officer-status"><span class="status-dot"></span> ${memur.durum}</span>
+            </div>
+          `;
+          officersListEl.appendChild(card);
+        });
+      });
+    }
+  </script>
+</body>
+</html>
