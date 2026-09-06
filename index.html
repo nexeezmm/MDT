@@ -167,7 +167,8 @@
     <div class="top-bar">
       <button class="toggle-btn" id="toggleSidebar"><i class="fa-solid fa-bars"></i></button>
       <div class="user-info-box">
-        <button class="btn btn-perm" id="openPermModalBtn"><i class="fa-solid fa-user-shield"></i> YETKİ YÖNETİMİ</button>
+        <!-- BUTON VARSAYILAN OLARAK GİZLENDİ -->
+        <button class="btn btn-perm" id="openPermModalBtn" style="display:none;"><i class="fa-solid fa-user-shield"></i> YETKİ YÖNETİMİ</button>
         <span class="user-info" id="activeUserInfo">Bilinmeyen Kullanıcı</span>
       </div>
     </div>
@@ -277,7 +278,7 @@
 
     function saveNotes() { localStorage.setItem('mrpd_notes', JSON.stringify(notes)); }
 
-    // --- OTOMATİK OTURUM KONTROLÜ (BENİ HATIRLA) ---
+    // --- OTOMATİK OTURUM KONTROLÜ ---
     function checkDiscordToken() {
       const savedUser = localStorage.getItem('mrpd_saved_user');
       if (savedUser) {
@@ -324,7 +325,8 @@
       db.ref('yetkiler/' + userData.id).once('value').then((snapshot) => {
         const val = snapshot.val();
 
-        if (userData.id === KURUCU_DISCORD_ID) {
+        // KURUCU KONTROLÜ: SADECE KODDAKİ DISCORD ID İLE EŞLEŞİRSE KURUCU YAPILIR
+        if (String(userData.id) === String(KURUCU_DISCORD_ID)) {
           aktifKullanici = { id: userData.id, isim: val ? val.isim : "Erkan", rol: "Kurucu", seviye: 2 };
         } else if (val) {
           aktifKullanici = { id: userData.id, isim: val.isim || userData.username, rol: val.rol || "Memur", seviye: parseInt(val.seviye) || 0 };
@@ -340,6 +342,13 @@
     function oturumAc() {
       loginScreen.style.display = 'none';
       activeUserInfo.innerHTML = `AKTİF PROFİL: <span style="color:white;">${aktifKullanici.isim} [${aktifKullanici.rol}]</span>`;
+
+      // YETKİ YÖNETİM BUTONUNU SADECE KURUCU İÇİN GÖRÜNÜR YAP
+      if (aktifKullanici && String(aktifKullanici.id) === String(KURUCU_DISCORD_ID)) {
+        openPermModalBtn.style.display = 'inline-flex';
+      } else {
+        openPermModalBtn.style.display = 'none';
+      }
 
       arayuzuYetkiyeGoreAyarla();
       renderNotesList();
@@ -378,10 +387,22 @@
     }
 
     // --- YETKİ YÖNETİMİ MODAL İŞLEMLERİ ---
-    openPermModalBtn.addEventListener('click', () => { permModal.style.display = 'flex'; });
+    openPermModalBtn.addEventListener('click', () => { 
+      if (aktifKullanici && String(aktifKullanici.id) === String(KURUCU_DISCORD_ID)) {
+        permModal.style.display = 'flex'; 
+      } else {
+        alert("Bu işlem için Kurucu yetkiniz bulunmuyor!");
+      }
+    });
+
     closePermModalBtn.addEventListener('click', () => { permModal.style.display = 'none'; });
 
     savePermBtn.addEventListener('click', () => {
+      if (!aktifKullanici || String(aktifKullanici.id) !== String(KURUCU_DISCORD_ID)) {
+        alert("Yetki kaydetme izniniz yok!");
+        return;
+      }
+
       const id = document.getElementById('permDiscordId').value.trim();
       const isim = document.getElementById('permName').value.trim();
       const rol = document.getElementById('permRole').value.trim();
@@ -422,7 +443,7 @@
               <strong style="color:var(--accent-gold);">${item.isim}</strong> (${item.rol}) - <span style="font-size:0.8rem; color:var(--text-muted);">${id}</span>
               <br><small>Seviye: ${item.seviye}</small>
             </div>
-            <i class="fa-solid fa-trash perm-item-del" onclick="deletePerm('${id}')"></i>
+            ${String(aktifKullanici?.id) === String(KURUCU_DISCORD_ID) ? `<i class="fa-solid fa-trash perm-item-del" onclick="deletePerm('${id}')"></i>` : ''}
           `;
           permListEl.appendChild(div);
         });
@@ -430,6 +451,10 @@
     }
 
     window.deletePerm = function(id) {
+      if (!aktifKullanici || String(aktifKullanici.id) !== String(KURUCU_DISCORD_ID)) {
+        alert("Silme yetkiniz yok!");
+        return;
+      }
       if (confirm("Bu kişinin yetkisini silmek istediğinize emin misiniz?")) {
         db.ref('yetkiler/' + id).remove();
       }
