@@ -25,6 +25,8 @@
       --danger: #d93025;
       --border-color: #1e3256;
       --success-green: #2ec4b6;
+      --discord-btn: #5865F2;
+      --discord-btn-hover: #4752C4;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -33,8 +35,30 @@
     /* --- GİRİŞ EKRANI --- */
     #loginScreen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle at center, var(--panel-bg) 0%, var(--bg-color) 100%); z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; }
     #loginScreen h1 { color: var(--accent-gold); font-size: 2.5rem; letter-spacing: 2px; text-shadow: 0 0 10px rgba(245, 196, 81, 0.3); }
-    .pin-input { padding: 15px; font-size: 1.5rem; text-align: center; background: rgba(10, 19, 37, 0.9); color: white; border: 2px solid var(--border-color); border-radius: 6px; outline: none; letter-spacing: 5px; transition: 0.3s; }
-    .pin-input:focus { border-color: var(--accent-gold); box-shadow: 0 0 15px rgba(245, 196, 81, 0.2); }
+    
+    .btn-discord {
+      background-color: var(--discord-btn);
+      color: white;
+      border: 1px solid #7983f5;
+      padding: 15px 25px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 700;
+      font-size: 1.2rem;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      width: 300px;
+      box-shadow: 0 4px 15px rgba(88, 101, 242, 0.4);
+    }
+    .btn-discord:hover {
+      background-color: var(--discord-btn-hover);
+      box-shadow: 0 0 20px rgba(88, 101, 242, 0.7);
+      transform: translateY(-2px);
+    }
 
     /* --- SOL MENÜ --- */
     .sidebar { width: 280px; background-color: var(--sidebar-bg); border-right: 2px solid var(--border-color); display: flex; flex-direction: column; transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1); box-shadow: 5px 0 15px rgba(0,0,0,0.5); z-index: 10; }
@@ -162,9 +186,11 @@
       <polygon points="50,22 57,40 76,40 61,51 67,69 50,58 33,69 39,51 24,40 43,40" fill="#f5c451"/>
     </svg>
     <h1>MRPD TERMİNAL GİRİŞİ</h1>
-    <input type="password" id="pinInput" class="pin-input" placeholder="SİCİL PİN" autocomplete="off">
-    <button id="loginBtn" class="btn" style="width: 280px; font-size: 1.2rem; padding: 15px;"><i class="fa-solid fa-right-to-bracket"></i> SİSTEME BAĞLAN</button>
-    <p id="loginError" style="color: var(--danger); font-weight: bold; display: none;">Geçersiz veya Yetkisiz Sicil Kodu!</p>
+    <button id="discordLoginBtn" class="btn-discord">
+      <i class="fa-brands fa-discord"></i> DISCORD İLE GİRİŞ YAP
+    </button>
+    <p id="loginStatus" style="color: var(--accent-gold); font-family: 'Roboto Mono', monospace; font-size: 0.9rem; display: none;"></p>
+    <p id="loginError" style="color: var(--danger); font-weight: bold; display: none;">Giriş başarısız oldu veya yetkiniz bulunmuyor!</p>
   </div>
 
   <!-- SOL MENÜ -->
@@ -215,6 +241,17 @@
   </div>
 
   <script>
+    // --- DISCORD & BACKEND AYARLARI ---
+    const DISCORD_CLIENT_ID = "1545969209584304238"; 
+    const REDIRECT_URI = window.location.origin + window.location.pathname; 
+    const BACKEND_URL = "https://senin-backend-servisin.onrender.com"; // Render/Node.js API adresin
+
+    // Yönetici Discord ID'leri ve Rol Tanımları
+    const YETKILI_DISCORD_IDS = {
+      "DISCORD_ID_1": { isim: "Erkan", rol: "Kurucu", seviye: 2 },
+      "DISCORD_ID_2": { isim: "Yönetim", rol: "Admin", seviye: 1 }
+    };
+
     // --- FIREBASE BAĞLANTISI ---
     const firebaseConfig = {
       apiKey: "AIzaSyASpycoIX3sd23tEkdh7mSRv1Qu2sU7EvE",
@@ -230,18 +267,12 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    // --- 1. KULLANICI VE YETKİ SİSTEMİ ---
-    const kullanicilar = {
-      "1999": { isim: "Erkan", rol: "Kurucu", seviye: 2 },
-      "2000": { isim: "Yönetim", rol: "Admin", seviye: 1 },
-      "3000": { isim: "Memur", rol: "Üye", seviye: 0 }
-    };
     let aktifKullanici = null;
 
-    // --- 2. DOM ELEMANLARI ---
+    // --- DOM ELEMANLARI ---
     const loginScreen = document.getElementById('loginScreen');
-    const pinInput = document.getElementById('pinInput');
-    const loginBtn = document.getElementById('loginBtn');
+    const discordLoginBtn = document.getElementById('discordLoginBtn');
+    const loginStatus = document.getElementById('loginStatus');
     const loginError = document.getElementById('loginError');
     const activeUserInfo = document.getElementById('activeUserInfo');
 
@@ -254,7 +285,7 @@
     const sidebarEl = document.getElementById('sidebar');
     const officersListEl = document.getElementById('officersList');
 
-    // --- 3. VERİ SİSTEMİ ---
+    // --- VERİ SİSTEMİ ---
     let notes = JSON.parse(localStorage.getItem('mrpd_notes')) || [
       { id: 1, title: 'AKTİF KODLAR (10-KODLARI)', body: '10-04: Anlaşıldı<br>10-20: Konum Bildir<br><br><i>Telsiz kodlarına riayet ediniz.</i>' }
     ];
@@ -262,28 +293,73 @@
 
     function saveNotes() { localStorage.setItem('mrpd_notes', JSON.stringify(notes)); }
 
-    // --- 4. GİRİŞ İŞLEMLERİ ---
-    loginBtn.addEventListener('click', islemeBasla);
-    pinInput.addEventListener('keypress', function(e) { if (e.key === 'Enter') islemeBasla(); });
+    // --- DISCORD OAUTH2 GİRİŞ İŞLEMLERİ ---
+    discordLoginBtn.addEventListener('click', () => {
+      const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=identify%20guilds.members.read`;
+      window.location.href = authUrl;
+    });
 
-    function islemeBasla() {
-      const pin = pinInput.value;
-      if (kullanicilar[pin]) {
-        aktifKullanici = kullanicilar[pin];
-        loginScreen.style.display = 'none';
-        activeUserInfo.innerHTML = `AKTİF PROFİL: <span style="color:white;">${aktifKullanici.isim} [${aktifKullanici.rol}]</span>`;
-        arayuzuYetkiyeGoreAyarla();
-        renderNotesList();
-        loadActiveNote();
-        listenActiveOfficers(); // Firebase CANLI DİNLEME BAŞLAT
-      } else {
-        loginError.style.display = 'block';
-        pinInput.value = '';
+    window.addEventListener('DOMContentLoaded', async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const code = urlParams.get('code');
+
+      if (code) {
+        // URL'den code parametresini temizle
+        window.history.replaceState({}, document.title, window.location.pathname);
+        
+        loginStatus.style.display = 'block';
+        loginStatus.innerText = "Discord Hesabı Doğrulanıyor...";
+        discordLoginBtn.style.display = 'none';
+
+        try {
+          // Backend sunucusuna code gönder ve kullanıcı verisini çek
+          const response = await fetch(`${BACKEND_URL}/api/auth/discord`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code: code, redirect_uri: REDIRECT_URI })
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            oturumAc(data.user);
+          } else {
+            showLoginError("Discord doğrulaması başarısız!");
+          }
+        } catch (err) {
+          showLoginError("Sunucu bağlantı hatası!");
+        }
       }
+    });
+
+    function oturumAc(userData) {
+      const ozelYetki = YETKILI_DISCORD_IDS[userData.id];
+
+      aktifKullanici = {
+        id: userData.id,
+        isim: ozelYetki ? ozelYetki.isim : (userData.global_name || userData.username),
+        rol: ozelYetki ? ozelYetki.rol : "Memur",
+        seviye: ozelYetki ? ozelYetki.seviye : 0
+      };
+
+      loginScreen.style.display = 'none';
+      activeUserInfo.innerHTML = `AKTİF PROFİL: <span style="color:white;">${aktifKullanici.isim} [${aktifKullanici.rol}]</span>`;
+      
+      arayuzuYetkiyeGoreAyarla();
+      renderNotesList();
+      loadActiveNote();
+      listenActiveOfficers();
+    }
+
+    function showLoginError(msg) {
+      loginStatus.style.display = 'none';
+      loginError.style.display = 'block';
+      loginError.innerText = msg;
+      discordLoginBtn.style.display = 'flex';
     }
 
     function arayuzuYetkiyeGoreAyarla() {
-      if (aktifKullanici.seviye === 0) { // ÜYE
+      if (aktifKullanici.seviye === 0) { // MEMUR / ÜYE
         addNoteBtn.style.display = 'none';
         deleteNoteBtn.style.display = 'none';
         noteTitleEl.readOnly = true;
@@ -303,7 +379,7 @@
       }
     }
 
-    // --- 5. UYGULAMA İŞLEMLERİ ---
+    // --- UYGULAMA İŞLEMLERİ ---
     function renderNotesList() {
       notesListEl.innerHTML = '';
       notes.forEach(note => {
