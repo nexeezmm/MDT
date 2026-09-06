@@ -6,7 +6,6 @@
   <title>MRPD - Mobile Data Terminal</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   
-  <!-- FIREBASE SDK (COMPAT VERSION) -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
@@ -32,7 +31,6 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Rajdhani', sans-serif; background-color: var(--bg-color); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; }
 
-    /* --- GİRİŞ EKRANI --- */
     #loginScreen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle at center, var(--panel-bg) 0%, var(--bg-color) 100%); z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; }
     #loginScreen h1 { color: var(--accent-gold); font-size: 2.5rem; letter-spacing: 2px; text-shadow: 0 0 10px rgba(245, 196, 81, 0.3); }
     
@@ -60,7 +58,6 @@
       transform: translateY(-2px);
     }
 
-    /* --- SOL MENÜ --- */
     .sidebar { width: 280px; background-color: var(--sidebar-bg); border-right: 2px solid var(--border-color); display: flex; flex-direction: column; transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1); box-shadow: 5px 0 15px rgba(0,0,0,0.5); z-index: 10; }
     .sidebar.collapsed { transform: translateX(-280px); margin-right: -280px; }
     .brand { padding: 20px; display: flex; align-items: center; gap: 15px; border-bottom: 2px solid var(--border-color); background: linear-gradient(180deg, #112140 0%, var(--sidebar-bg) 100%); }
@@ -85,7 +82,6 @@
     .note-item.active { background-color: var(--primary-blue); border-color: var(--primary-blue-hover); box-shadow: inset 4px 0 0 var(--accent-gold); }
     .note-item.active i { color: white; }
 
-    /* --- ORTA İÇERİK --- */
     .main-content { flex: 1; display: flex; flex-direction: column; background: radial-gradient(circle at center, var(--panel-bg) 0%, var(--bg-color) 100%); position: relative; }
     .top-bar { height: 60px; background-color: var(--sidebar-bg); border-bottom: 2px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; padding: 0 20px; }
     .toggle-btn { background: none; border: none; color: var(--accent-gold); font-size: 1.5rem; cursor: pointer; transition: 0.3s; }
@@ -101,7 +97,6 @@
     .btn-delete { background-color: transparent; border: 2px solid var(--danger); color: var(--danger); }
     .btn-delete:hover { background-color: var(--danger); color: white; box-shadow: 0 0 15px rgba(217, 48, 37, 0.5); }
 
-    /* ZENGİN METİN EDİTÖRÜ CSS AYARLARI */
     .body-textarea { 
       flex: 1; 
       background-color: rgba(10, 19, 37, 0.7); 
@@ -121,7 +116,6 @@
     .body-textarea[contenteditable]:empty::before { content: attr(data-placeholder); color: #8b9bb4; pointer-events: none; display: block; }
     .body-textarea img { max-width: 100%; border-radius: 6px; border: 2px solid var(--accent-gold); margin: 15px 0; display: block; }
 
-    /* --- SAĞ TARAF: CANLI DEVRİYE / AKTİF MEMURLAR PANENELİ --- */
     .active-officers-panel {
       width: 260px;
       background-color: var(--sidebar-bg);
@@ -178,7 +172,6 @@
 </head>
 <body>
 
-  <!-- YETKİ GİRİŞ EKRANI -->
   <div id="loginScreen">
     <svg class="logo-svg" style="width: 100px; height: 100px; margin-bottom: 20px;" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
       <path d="M50 5 L10 20 L10 55 C10 85 50 95 50 95 C50 95 90 85 90 55 L90 20 Z" fill="#0a1325" stroke="#f5c451" stroke-width="4"/>
@@ -193,7 +186,6 @@
     <p id="loginError" style="color: var(--danger); font-weight: bold; display: none;">Giriş başarısız oldu veya yetkiniz bulunmuyor!</p>
   </div>
 
-  <!-- SOL MENÜ -->
   <div class="sidebar" id="sidebar">
     <div class="brand">
       <svg class="logo-svg" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
@@ -212,7 +204,6 @@
     <ul class="notes-list" id="notesList"></ul>
   </div>
 
-  <!-- ORTA İÇERİK -->
   <div class="main-content">
     <div class="scanlines"></div>
     <div class="top-bar">
@@ -228,7 +219,6 @@
     </div>
   </div>
 
-  <!-- SAĞ TARAF: CANLI DEVRİYE / AKTİF MEMURLAR PANENELİ -->
   <div class="active-officers-panel">
     <div class="panel-title">
       <i class="fa-solid fa-headset"></i> AKTİF MEMURLAR
@@ -241,18 +231,15 @@
   </div>
 
   <script>
-    // --- DISCORD & BACKEND AYARLARI ---
-    const DISCORD_CLIENT_ID = "1545959209584304238"; 
-    const REDIRECT_URI = window.location.origin + window.location.pathname; 
-    const BACKEND_URL = "https://senin-backend-servisin.onrender.com"; // Render/Node.js API adresin
+    const DISCORD_CLIENT_ID = "1545969209584304238"; 
+    const REDIRECT_URI = "https://nexeezmm.github.io/MDT/"; 
+    const BACKEND_URL = "https://senin-backend-servisin.onrender.com";
 
-    // Yönetici Discord ID'leri ve Rol Tanımları
     const YETKILI_DISCORD_IDS = {
       "DISCORD_ID_1": { isim: "Erkan", rol: "Kurucu", seviye: 2 },
       "DISCORD_ID_2": { isim: "Yönetim", rol: "Admin", seviye: 1 }
     };
 
-    // --- FIREBASE BAĞLANTISI ---
     const firebaseConfig = {
       apiKey: "AIzaSyASpycoIX3sd23tEkdh7mSRv1Qu2sU7EvE",
       authDomain: "mdt-n-65377.firebaseapp.com",
@@ -269,7 +256,6 @@
 
     let aktifKullanici = null;
 
-    // --- DOM ELEMANLARI ---
     const loginScreen = document.getElementById('loginScreen');
     const discordLoginBtn = document.getElementById('discordLoginBtn');
     const loginStatus = document.getElementById('loginStatus');
@@ -285,7 +271,6 @@
     const sidebarEl = document.getElementById('sidebar');
     const officersListEl = document.getElementById('officersList');
 
-    // --- VERİ SİSTEMİ ---
     let notes = JSON.parse(localStorage.getItem('mrpd_notes')) || [
       { id: 1, title: 'AKTİF KODLAR (10-KODLARI)', body: '10-04: Anlaşıldı<br>10-20: Konum Bildir<br><br><i>Telsiz kodlarına riayet ediniz.</i>' }
     ];
@@ -293,9 +278,9 @@
 
     function saveNotes() { localStorage.setItem('mrpd_notes', JSON.stringify(notes)); }
 
-    // --- DISCORD OAUTH2 GİRİŞ İŞLEMLERİ ---
     discordLoginBtn.addEventListener('click', () => {
-      const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=identify%20guilds.members.read`;
+      const cleanClientId = DISCORD_CLIENT_ID.trim();
+      const authUrl = "https://discord.com/api/oauth2/authorize?client_id=" + cleanClientId + "&redirect_uri=" + encodeURIComponent(REDIRECT_URI) + "&response_type=code&scope=identify%20guilds.members.read";
       window.location.href = authUrl;
     });
 
@@ -304,7 +289,6 @@
       const code = urlParams.get('code');
 
       if (code) {
-        // URL'den code parametresini temizle
         window.history.replaceState({}, document.title, window.location.pathname);
         
         loginStatus.style.display = 'block';
@@ -312,7 +296,6 @@
         discordLoginBtn.style.display = 'none';
 
         try {
-          // Backend sunucusuna code gönder ve kullanıcı verisini çek
           const response = await fetch(`${BACKEND_URL}/api/auth/discord`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -359,19 +342,19 @@
     }
 
     function arayuzuYetkiyeGoreAyarla() {
-      if (aktifKullanici.seviye === 0) { // MEMUR / ÜYE
+      if (aktifKullanici.seviye === 0) {
         addNoteBtn.style.display = 'none';
         deleteNoteBtn.style.display = 'none';
         noteTitleEl.readOnly = true;
         noteBodyEl.setAttribute('contenteditable', 'false');
       } 
-      else if (aktifKullanici.seviye === 1) { // ADMİN
+      else if (aktifKullanici.seviye === 1) {
         addNoteBtn.style.display = 'flex';
         deleteNoteBtn.style.display = 'none';
         noteTitleEl.readOnly = false;
         noteBodyEl.setAttribute('contenteditable', 'true');
       }
-      else if (aktifKullanici.seviye === 2) { // KURUCU
+      else if (aktifKullanici.seviye === 2) {
         addNoteBtn.style.display = 'flex';
         deleteNoteBtn.style.display = 'flex';
         noteTitleEl.readOnly = false;
@@ -379,7 +362,6 @@
       }
     }
 
-    // --- UYGULAMA İŞLEMLERİ ---
     function renderNotesList() {
       notesListEl.innerHTML = '';
       notes.forEach(note => {
@@ -433,7 +415,6 @@
       if (activeNote) { activeNote.body = noteBodyEl.innerHTML; saveNotes(); }
     });
 
-    // --- RESİM YAPIŞTIRMA (PASTE) SİSTEMİ ---
     noteBodyEl.addEventListener('paste', (e) => {
       if (aktifKullanici.seviye < 1) {
         e.preventDefault();
@@ -478,7 +459,6 @@
 
     toggleSidebarBtn.addEventListener('click', () => { sidebarEl.classList.toggle('collapsed'); });
 
-    // --- CANLI FIREBASE DİNLEYİCİ (AKTİF MEMURLAR) ---
     function listenActiveOfficers() {
       db.ref('aktif_memurlar').on('value', (snapshot) => {
         const data = snapshot.val();
