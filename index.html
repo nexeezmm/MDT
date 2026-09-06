@@ -167,9 +167,9 @@
     <div class="top-bar">
       <button class="toggle-btn" id="toggleSidebar"><i class="fa-solid fa-bars"></i></button>
       <div class="user-info-box">
-        <!-- BUTON VARSAYILAN OLARAK GİZLENDİ -->
         <button class="btn btn-perm" id="openPermModalBtn" style="display:none;"><i class="fa-solid fa-user-shield"></i> YETKİ YÖNETİMİ</button>
         <span class="user-info" id="activeUserInfo">Bilinmeyen Kullanıcı</span>
+        <button class="btn btn-delete" id="logoutBtn" style="padding: 6px 12px; font-size: 0.85rem;"><i class="fa-solid fa-right-from-bracket"></i> ÇIKIŞ YAP</button>
       </div>
     </div>
     <div class="editor-container" id="editorContainer">
@@ -254,6 +254,7 @@
     const loginStatus = document.getElementById('loginStatus');
     const loginError = document.getElementById('loginError');
     const activeUserInfo = document.getElementById('activeUserInfo');
+    const logoutBtn = document.getElementById('logoutBtn');
 
     const notesListEl = document.getElementById('notesList');
     const noteTitleEl = document.getElementById('noteTitle');
@@ -318,6 +319,17 @@
       window.location.href = authUrl;
     });
 
+    // ÇIKIŞ YAP İŞLEMİ
+    if (logoutBtn) {
+      logoutBtn.addEventListener('click', () => {
+        if (confirm("Oturumu kapatıp farklı bir hesapla giriş yapmak istediğinize emin misiniz?")) {
+          localStorage.removeItem('mrpd_saved_user');
+          aktifKullanici = null;
+          window.location.reload();
+        }
+      });
+    }
+
     window.addEventListener('DOMContentLoaded', checkDiscordToken);
     window.addEventListener('hashchange', checkDiscordToken);
 
@@ -325,7 +337,6 @@
       db.ref('yetkiler/' + userData.id).once('value').then((snapshot) => {
         const val = snapshot.val();
 
-        // KURUCU KONTROLÜ: SADECE KODDAKİ DISCORD ID İLE EŞLEŞİRSE KURUCU YAPILIR
         if (String(userData.id) === String(KURUCU_DISCORD_ID)) {
           aktifKullanici = { id: userData.id, isim: val ? val.isim : "Erkan", rol: "Kurucu", seviye: 2 };
         } else if (val) {
@@ -343,7 +354,6 @@
       loginScreen.style.display = 'none';
       activeUserInfo.innerHTML = `AKTİF PROFİL: <span style="color:white;">${aktifKullanici.isim} [${aktifKullanici.rol}]</span>`;
 
-      // YETKİ YÖNETİM BUTONUNU SADECE KURUCU İÇİN GÖRÜNÜR YAP
       if (aktifKullanici && String(aktifKullanici.id) === String(KURUCU_DISCORD_ID)) {
         openPermModalBtn.style.display = 'inline-flex';
       } else {
