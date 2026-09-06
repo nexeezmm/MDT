@@ -244,9 +244,9 @@
     const DISCORD_CLIENT_ID = "1545959209584304238"; 
     const REDIRECT_URI = "https://nexeezmm.github.io/MDT/";
 
-    // ÖNEMLİ: Kendine yetki vermek için koda kendi Discord ID'ni tanımlayabilirsin.
-    const YETKILI_DISCORD_IDS = "793950477271957525": { isim: "Nexe", rol: "Kurucu", seviye: 2 }
-      // Örnek: "123456789012345678": { isim: "Erkan", rol: "Kurucu", seviye: 2 }
+    // --- YETKİLİ LİSTESİ (TÜM GİRİŞ YAPANLARA VEYA ID İLE ÖZEL YETKİ) ---
+    const YETKILI_DISCORD_IDS = {
+      "1545959209584304238": { isim: "Erkan", rol: "Kurucu", seviye: 2 }
     };
 
     // --- FIREBASE BAĞLANTISI ---
@@ -303,9 +303,6 @@
       const accessToken = params.get('access_token');
 
       if (accessToken) {
-        // Hash temizliği yap
-        window.history.replaceState({}, document.title, window.location.pathname);
-        
         if (loginStatus) {
           loginStatus.style.display = 'block';
           loginStatus.innerText = "Discord Hesabı Doğrulanıyor...";
@@ -318,6 +315,8 @@
         .then(res => res.json())
         .then(userData => {
           if (userData && userData.id) {
+            // URL'deki hash bilgisini temizle
+            window.history.replaceState({}, document.title, window.location.pathname);
             oturumAc(userData);
           } else {
             showLoginError("Profil bilgisi alınamadı!");
@@ -336,7 +335,7 @@
     function oturumAc(userData) {
       const ozelYetki = YETKILI_DISCORD_IDS[userData.id];
 
-      // Herhangi bir yetki tanımı yoksa varsayılan olarak düzenleme yetkili (Seviye 2) açar
+      // Herhangi bir özel kayıt yoksa bile gelen tüm Discord kullanıcılarına düzenleme yetkisi (Seviye 2) tanımlar
       aktifKullanici = {
         id: userData.id,
         isim: ozelYetki ? ozelYetki.isim : (userData.global_name || userData.username),
