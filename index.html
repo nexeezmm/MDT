@@ -271,15 +271,11 @@
     const savePermBtn = document.getElementById('savePermBtn');
     const permListEl = document.getElementById('permList');
 
-    // --- VERİ SİSTEMİ ---
-    let notes = JSON.parse(localStorage.getItem('mrpd_notes')) || [
-      { id: 1, title: 'AKTİF KODLAR (10-KODLARI)', body: '10-04: Anlaşıldı<br>10-20: Konum Bildir<br><br><i>Telsiz kodlarına riayet ediniz.</i>' }
-    ];
-    let activeNoteId = notes.length > 0 ? notes[0].id : null;
+    // --- VERİ SİSTEMİ (FIREBASE YANSIMASI) ---
+    let notes = [];
+    let activeNoteId = null;
 
-    function saveNotes() { localStorage.setItem('mrpd_notes', JSON.stringify(notes)); }
-
-    // --- OTOMATİK OTURUM KONTROLÜ ---
+    // OTOMATİK OTURUM KONTROLÜ
     function checkDiscordToken() {
       const savedUser = localStorage.getItem('mrpd_saved_user');
       if (savedUser) {
@@ -319,7 +315,6 @@
       window.location.href = authUrl;
     });
 
-    // ÇIKIŞ YAP İŞLEMİ
     if (logoutBtn) {
       logoutBtn.addEventListener('click', () => {
         if (confirm("Oturumu kapatıp farklı bir hesapla giriş yapmak istediğinize emin misiniz?")) {
@@ -361,8 +356,7 @@
       }
 
       arayuzuYetkiyeGoreAyarla();
-      renderNotesList();
-      loadActiveNote();
+      listenNotes();
       listenActiveOfficers();
       listenPermList();
     }
@@ -394,6 +388,31 @@
         noteTitleEl.readOnly = false;
         noteBodyEl.setAttribute('contenteditable', 'true');
       }
+    }
+
+    // --- FIREBASE RAPOR DİNLEYİCİ (ORTAK VERİ YOLU) ---
+    function listenNotes() {
+      db.ref('raporlar').on('value', (snapshot) => {
+        const data = snapshot.val();
+        notes = [];
+        if (data) {
+          Object.keys(data).forEach(key => {
+            notes.push({ id: key, title: data[key].title, body: data[key].body });
+          });
+          notes.reverse();
+        }
+
+        if (notes.length > 0) {
+          if (!activeNoteId || !notes.find(n => n.id === activeNoteId)) {
+            activeNoteId = notes[0].id;
+          }
+        } else {
+          activeNoteId = null;
+        }
+
+        renderNotesList();
+        loadActiveNote();
+      });
     }
 
     // --- YETKİ YÖNETİMİ MODAL İŞLEMLERİ ---
@@ -470,7 +489,7 @@
       }
     };
 
-    // --- MDT DOSYA / RAPOR İŞLEMLERİ ---
+    // --- MDT DOSYA / RAPOR İŞLEMLERİ (FIREBASE UYUMLU) ---
     function renderNotesList() {
       notesListEl.innerHTML = '';
       notes.forEach(note => {
@@ -493,7 +512,7 @@
     function loadActiveNote() {
       const activeNote = notes.find(n => n.id === activeNoteId);
       if (activeNote) {
-        noteTitleEl.value = activeNote.title;
+        noteTitleEl.value = activeNote.title || '';
         noteBodyEl.innerHTML = activeNote.body || '';
       } else {
         noteTitleEl.value = '';
@@ -503,29 +522,28 @@
 
     addNoteBtn.addEventListener('click', () => {
       if (!aktifKullanici || aktifKullanici.seviye < 1) return;
-      const newNote = { id: Date.now(), title: 'YENİ DOSYA #' + Math.floor(Math.random() * 1000), body: '' };
-      notes.unshift(newNote);
-      activeNoteId = newNote.id;
-      saveNotes();
-      renderNotesList();
-      loadActiveNote();
-      noteTitleEl.focus();
+      const newRef = db.ref('raporlar').push();
+      const newNote = {
+        title: 'YENİ DOSYA #' + Math.floor(Math.random() * 1000),
+        body: ''
+      };
+      newRef.set(newNote).then(() => {
+        activeNoteId = newRef.key;
+      });
     });
 
     noteTitleEl.addEventListener('input', (e) => {
-      if (!aktifKullanici || aktifKullanici.seviye < 1) return;
-      const activeNote = notes.find(n => n.id === activeNoteId);
-      if (activeNote) { activeNote.title = e.target.value; saveNotes(); renderNotesList(); }
+      if (!aktifKullanici || aktifKullanici.seviye < 1 || !activeNoteId) return;
+      db.ref('raporlar/' + activeNoteId + '/title').set(e.target.value);
     });
 
     noteBodyEl.addEventListener('input', () => {
-      if (!aktifKullanici || aktifKullanici.seviye < 1) return;
-      const activeNote = notes.find(n => n.id === activeNoteId);
-      if (activeNote) { activeNote.body = noteBodyEl.innerHTML; saveNotes(); }
+      if (!aktifKullanici || aktifKullanici.seviye < 1 || !activeNoteId) return;
+      db.ref('raporlar/' + activeNoteId + '/body').set(noteBodyEl.innerHTML);
     });
 
     noteBodyEl.addEventListener('paste', (e) => {
-      if (!aktifKullanici || aktifKullanici.seviye < 1) { e.preventDefault(); return; }
+      if (!aktifKullanici || aktifKullanici.seviye < 1 || !activeNoteId) { e.preventDefault(); return; }
       
       const items = (e.clipboardData || e.originalEvent.clipboardData).items;
       for (let index in items) {
@@ -537,8 +555,7 @@
           reader.onload = function(event) {
             const imgHTML = `<br><img src="${event.target.result}" alt="Kanıt Resmi" /><br>`;
             document.execCommand('insertHTML', false, imgHTML);
-            const activeNote = notes.find(n => n.id === activeNoteId);
-            if (activeNote) { activeNote.body = noteBodyEl.innerHTML; saveNotes(); }
+            db.ref('raporlar/' + activeNoteId + '/body').set(noteBodyEl.innerHTML);
           };
           reader.readAsDataURL(blob);
         }
@@ -546,14 +563,9 @@
     });
 
     deleteNoteBtn.addEventListener('click', () => {
-      if (!aktifKullanici || aktifKullanici.seviye < 2) return;
-      if (notes.length === 0) return;
-      if(confirm('Bu dosyayı imha etmek istediğinize emin misiniz?')) {
-        notes = notes.filter(n => n.id !== activeNoteId);
-        activeNoteId = notes.length > 0 ? notes[0].id : null;
-        saveNotes();
-        renderNotesList();
-        loadActiveNote();
+      if (!aktifKullanici || aktifKullanici.seviye < 2 || !activeNoteId) return;
+      if (confirm('Bu dosyayı imha etmek istediğinize emin misiniz?')) {
+        db.ref('raporlar/' + activeNoteId).remove();
       }
     });
 
